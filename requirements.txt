@@ -1,0 +1,11 @@
+numpy
+scipy
+scikit-learn
+matplotlib
+networkx
+
+pyunlocbox
+pygsp
+
+jupyter
+ipython

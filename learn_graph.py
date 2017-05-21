@@ -11,8 +11,9 @@ from scipy import spatial
 from pyunlocbox import functions, solvers
 
 
-def log_degree_barrier(z, alpha=1, beta=1, step=0.5, w0=None, maxit=1000,
-                       rtol=1e-5, verbosity='NONE'):
+def log_degree_barrier(X, dist_type='sqeuclidean', alpha=1, beta=1, step=0.5,
+                       w0=None, maxit=1000, rtol=1e-5, retall=False,
+                       verbosity='NONE'):
     r"""
     Learn graph by imposing a log barrier on the degrees
 
@@ -24,9 +25,12 @@ def log_degree_barrier(z, alpha=1, beta=1, step=0.5, w0=None, maxit=1000,
 
     Parameters
     ----------
-    z : array_like
-        A vector of dimension N(N - 1)/2 or a symmetric matrix of dimension
-        NxN encoding the pairwise distances between nodes.
+    X : array_like
+        An N-by-M data matrix of N variable observations in an M-dimensional
+        space. The learned graph will have N nodes.
+    dist_type : string
+        Type of pairwise distance between variables. See
+        :func:`spatial.distance.pdist` for the possible options.
     alpha : float, optional
         Regularization parameter acting on the log barrier
     beta : float, optional
@@ -40,6 +44,9 @@ def log_degree_barrier(z, alpha=1, beta=1, step=0.5, w0=None, maxit=1000,
         Maximum number of iterations.
     rtol : float, optional
         Stopping criterion. Relative tolerance between successive updates.
+    retall : boolean
+        Return solution and problem details. See output of
+        :func:`pyunlocbox.solvers.solve`.
     verbosity : {'NONE', 'LOW', 'HIGH', 'ALL'}, optional
         Level of verbosity of the solver. See :func:`pyunlocbox.solvers.solve`.
 
@@ -55,8 +62,6 @@ def log_degree_barrier(z, alpha=1, beta=1, step=0.5, w0=None, maxit=1000,
     -----
     This is the solver proposed in [Kalofolias, 2016] :cite:`kalofolias2016`.
 
-    See :func:`scipy.spatial.distance` for examples on how to generate
-    pairwise distances.
 
     Examples
     --------
@@ -93,21 +98,23 @@ def log_degree_barrier(z, alpha=1, beta=1, step=0.5, w0=None, maxit=1000,
     >>> plt.title('Learned')
     """
 
-    # Parse z
-    z, N = utils.parse_distances(z)
+    # Parse X
+    N = X.shape[0]
+    z = spatial.distance.pdist(X, dist_type)  # Pairwise distances
 
     # Get primal-dual linear map
     K, Kt = utils.weight2degmap(N)
     norm_K = np.sqrt(2 * (N - 1))
 
     # Parse stepsize
-    stepsize = step / (2 * beta + norm_K)
-    stepsize = min(stepsize, 1 / (2 * beta + norm_K))
-    stepsize = max(stepsize, 0)
+    if (step <= 0) or (step > 1):
+        raise ValueError("step must be a number between 0 and 1.")
+    stepsize = step / (1 + 2 * beta + norm_K)
 
     # Parse initial weights
     w0 = np.zeros(z.shape) if w0 is None else w0
-    assert w0.shape == z.shape, "w0 must have the same shape as z."
+    if (w0.shape != z.shape):
+        raise ValueError("w0 must be of dimension N(N-1)/2.")
 
     # Assemble functions in the objective
     f1 = functions.func()
@@ -129,7 +136,10 @@ def log_degree_barrier(z, alpha=1, beta=1, step=0.5, w0=None, maxit=1000,
     problem = solvers.solve([f1, f2, f3], x0=w0, solver=solver, maxit=maxit,
                             rtol=rtol, verbosity=verbosity)
 
-    if verbosity == 'NONE':
-        return spatial.distance.squareform(problem['sol'])
+    # Transform weight matrix from vector form to matrix form
+    W = spatial.distance.squareform(problem['sol'])
+
+    if retall:
+        return W, problem
     else:
-        return spatial.distance.squareform(problem['sol']), problem
+        return W

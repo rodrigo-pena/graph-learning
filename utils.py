@@ -7,8 +7,8 @@ Several of these functions were based on the pygsp toolbox:
 http://pygsp.readthedocs.io/en/latest/
 """
 
-import autograd.numpy as np
-from scipy import sparse, spatial
+import numpy as np
+from scipy import sparse
 
 # -----------------------------------------------------------------------------
 """ Functions used in :func:`learn_graph.log_degree_barrier method` """
@@ -62,43 +62,6 @@ def weight2degmap(N, array=False):
         return lambda w: K.dot(w), lambda d: K.transpose().dot(d)
 
 
-def parse_distances(z):
-    r"""
-    Parse distance matrix/vector
-
-    Parameters
-    ----------
-    z : array_like
-        A vector of dimension N(N - 1)/2 or a symmetric matrix of dimension
-        NxN encoding the pairwise distances between nodes.
-
-    Returns
-    -------
-    z : array_like
-        A vector of dimension N(N - 1)/2 encoding the pairwise distances
-        between nodes.
-    N : int
-        Number of nodes in the graph
-
-    Notes
-    -----
-    Used in :func:`learn_graph.log_degree_barrier method`.
-
-    """
-    import numpy as np
-
-    dims = z.shape
-    try:  # z is a square matrix
-        N = dims[1]
-        assert(N == dims[0])
-        z[:] = spatial.distance.squareform(z)
-    except:  # z is a vector
-        Ne = dims[0]
-        N = int(0.5 * (1 + np.sqrt(1 + 8 * Ne)))
-
-    return z, N
-
-
 def plot_objectives(objective, labels=None, fig=None):
     import matplotlib.pyplot as plt
     import matplotlib.cm
@@ -131,6 +94,8 @@ def plot_objectives(objective, labels=None, fig=None):
     ax.set_ylim([np.min(objective) - 1, np.max(objective) + 1])
 
     return fig, ax
+
+
 # -----------------------------------------------------------------------------
 
 
@@ -408,126 +373,3 @@ def symmetrize(W, symm_type='average', sparse_flag=True):
         return W + mask.multiply(W.T) if sparse_flag else W + (mask * W.T)
     else:
         return W
-
-
-def sigmoid(x):
-    r"""
-    Numerically stable sigmoid function.
-
-    Parameters
-    ----------
-    x : float or array_like
-
-    Returns
-    -------
-    y : float or array_like
-        Result of applying the sigmoid function to each element in x.
-
-    Notes
-    -----
-    Inspired by `Tim Vieira <http://timvieira.github.io/blog/post/2014/02/11/
-    exp-normalize-trick/>`_
-
-    """
-
-    y = np.ravel(np.array(x))
-
-    # |!| Indexed assignment is not supported by autograd |!|
-    # for i in range(len(y)):
-    #     if y[i] >= 0:
-    #         z = np.exp(-y[i])
-    #         y[i] = 1. / (1 + z)
-    #     else:
-    #         z = np.exp(y[i])
-    #         y[i] = z / (1 + z)
-
-    # Possible workaround: build a list and call np.concatenate
-    # Reference: https://github.com/HIPS/autograd/issues/58
-    z = []  # List to be filled in
-    for i in range(len(y)):
-        if y[i] >= 0:
-            w = np.exp(-y[i])
-            z = np.concatenate((z, [1. / (1. + w)]))
-        else:
-            w = np.exp(y[i])
-            z = np.concatenate((z, [w / (1. + w)]))
-
-    return np.reshape(z, np.shape(x))
-
-
-def polyval(x, c, tensor=True):
-    """" Function polyval from numpy, not available in autograd.numpy """
-    c = np.array(c, ndmin=1, copy=0)
-
-    if c.dtype.char in '?bBhHiIlLqQpP':  # astype fails with NA
-        c = c + 0.0
-    if isinstance(x, (tuple, list)):
-        x = np.asarray(x)
-    if isinstance(x, np.ndarray) and tensor:
-        c = c.reshape(c.shape + (1,) * x.ndim)
-
-    c0 = c[-1] + x * 0
-    for i in range(2, len(c) + 1):
-        c0 = c[-i] + c0 * x
-
-    return c0
-
-
-def graphon(u, v, c):
-    """ Graphon parametrized by a soft-thresholded 2d polynomial. """
-    u = np.ravel(u)
-    v = np.ravel(v)
-
-    # Make sure the coefficients are symmetrix, because we want a symmetric
-    # graphon.
-    c = symmetrize(c, symm_type='average', sparse_flag=False)
-
-    # Call procedure in numpy.polynomial.polynomial.polygrid2d
-    r = polyval(u, c)
-    r = polyval(v, r)
-
-    return sigmoid(r)  # Soft-max to the interval [0,1]
-    # return min(u. v) # Previous version
-
-
-def sample_exchangeable_graph(u, c, sparse_flag=True):
-    r"""
-    Sample the adjacency matrix of an exchangeable random graph.
-
-    Parameters
-    ----------
-    u : array_like
-        A list of i.i.d. U(0,1) samples
-    c : array_like
-        An an array of ordered coefficients for the multi-degree terms in the
-        2d polynomial. See :func:`~numpy.polynomial.polynomial.polyval2d`.
-    sparse_flag : bool
-        Use sparse matrices (True) or not (False).
-
-    """
-
-    W = graphon(u, u, c)
-
-    # |!| Indexed assignment is not supported by autograd |!|
-    # Possible workaround: build a list and call np.concatenate
-    # Reference: https://github.com/HIPS/autograd/issues/58
-    # n = len(u)
-    # for i in range(n):
-    #     for j in range(i + 1, n):
-    #         # TODO: this random process gets in the way of the autogradient
-    #         # W[i, j] = np.random.binomial(1, W[i,j])
-    # W = symmetrize(W, symm_type='full', sparse_flag=sparse_flag)
-
-    return W.tocsr() if sparse_flag else W
-
-
-def batch(X, batch_size=32):
-    """ Generator of batches for data matrix X. """
-    order = np.random.permutation(X.shape[1])
-    i = 0
-    while True:
-        if i > (X.shape[0] - batch_size):
-            order = np.random.permutation(X.shape[1])
-            i = 0
-        yield X[:, order[i:i + batch_size]]
-        i += batch_size
