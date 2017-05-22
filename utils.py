@@ -67,7 +67,15 @@ def plot_objectives(objective, labels=None, fig=None):
     import matplotlib.cm
 
     objective = np.asarray(objective)
-    n, m = objective.shape
+
+    n = objective.shape[0]
+    try:
+        m = objective.shape[1]
+        obj = objective
+    except IndexError:
+        m = 1
+        obj = np.reshape(objective, (n, 1))
+
     if labels is None:
         labels = []
         for i in range(m):
@@ -82,16 +90,16 @@ def plot_objectives(objective, labels=None, fig=None):
     fig.set_figheight(6)
     fig.set_figwidth(12)
 
-    stride = 1. / (m - 1)
+    stride = 1. / (m - 1) if m > 1 else 1.
     cmap = matplotlib.cm.get_cmap('viridis')
 
-    for i in range(objective.shape[1]):
+    for i in range(m):
         color = cmap(i * stride)
-        ax.plot(objective[:, i], color=color, linewidth=2, label=labels[i])
+        ax.plot(obj[:, i], color=color, linewidth=2, label=labels[i])
 
     ax.legend(loc='best')
     ax.set_xlim([-1, n + 1])
-    ax.set_ylim([np.min(objective) - 1, np.max(objective) + 1])
+    ax.set_ylim([np.min(obj) - 1, np.max(obj) + 1])
 
     return fig, ax
 

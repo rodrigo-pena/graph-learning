@@ -2,13 +2,17 @@
 
 This repository compiles some solutions for the problem of learning a graphical representation of a set of data points.
 
-Currently, algorithms from the following papers are implemented:
+Currently, [learn-graph](https://github.com/rodrigo-pena/graph-learning/blob/master/learn_graph.py) implements algorithms from the following papers:
 
-* Kalofolias, V. [How to learn a graph from smooth signals][kalofolias], AISTATS, 2016.
+* Kalofolias, V. ["How to learn a graph from smooth signals"][kalofolias], AISTATS, 2016.
+* Dong et al. ["Laplacian Matrix Learning for Smooth Graph Signal Representation"][dong]. ICASSP, 2015.
+* Friedman, Hastie, and Tibshirani ["Sparse inverse covariance estimation with the graphical lasso"][glasso], Biostatistics 2008; 9 (3): 432-441.
 
 The code is released under the terms of the [MIT license](LICENSE.txt).
 
 [kalofolias]:  https://arxiv.org/abs/1601.02513
+[glasso]: http://statweb.stanford.edu/~tibs/ftp/graph.pdf
+[dong]: http://web.media.mit.edu/~xdong/paper/icassp2015.pdf
 
 ## Installation
 
